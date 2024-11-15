@@ -4,7 +4,7 @@ var table = ui.Chart(
     ],
     'Table', {allowHtml: true});
 
-
+var table = table
 
 // load image from bucket
 
@@ -17,91 +17,73 @@ var bandMapping = {
   655: {name: 'Rojo2', bands: 'SR_B13'}, // Banda 6 (Rojo 2) [655 nm]
   865: {name: 'NIR', bands: 'SR_B5'}, // Banda 7 (NIR) [685 nm]
 };
-
+var path='projects/stellar-horizon-248313/assets/'
+var format = ''
+var gcp = true
 
 // Lista de URIs de las imágenes de GCS
 var uris = [
-  'gs://l8_app/acolite/L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_865.tif',
-  'gs://l8_app/acolite/L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_561.tif',
-  'gs://l8_app/acolite/L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_655.tif',
-  'gs://l8_app/acolite/L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_483.tif',
-  'gs://l8_app/acolite/L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_483.tif',
-  'gs://l8_app/acolite/L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_655.tif',
-  'gs://l8_app/acolite/L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_613.tif',
-  'gs://l8_app/acolite/L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_613.tif',
-  'gs://l8_app/acolite/L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_443.tif',
-  'gs://l8_app/acolite/L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_483.tif',
-  'gs://l8_app/acolite/L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_592.tif',
-  'gs://l8_app/acolite/L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_561.tif',
-  'gs://l8_app/acolite/L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_655.tif',
-  'gs://l8_app/acolite/L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_483.tif',
-  'gs://l8_app/acolite/L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_613.tif',
-  'gs://l8_app/acolite/L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_592.tif',
-  'gs://l8_app/acolite/L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_865.tif',
-  'gs://l8_app/acolite/L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_561.tif',
-  'gs://l8_app/acolite/L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_443.tif',
-  'gs://l8_app/acolite/L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_443.tif',
-  'gs://l8_app/acolite/L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_592.tif',
-  'gs://l8_app/acolite/L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_561.tif',
-  'gs://l8_app/acolite/L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_865.tif',
-  'gs://l8_app/acolite/L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_865.tif',
-  'gs://l8_app/acolite/L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_613.tif',
-  'gs://l8_app/acolite/L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_655.tif',
-  'gs://l8_app/acolite/L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_443.tif',
-  'gs://l8_app/acolite/L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_592.tif'
+  path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_865'+ format,
+  path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_561'+ format,
+  path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_655'+ format,
+  path + 'acolite_L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_483'+ format,
+  path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_483'+ format,
+  path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_655'+ format,
+  path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_613'+ format,
+  path + 'acolite_L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_613'+ format,
+  path + 'acolite_L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_443'+ format,
+  path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_483'+ format,
+  path + 'acolite_L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_592'+ format,
+  path + 'acolite_L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_561'+ format,
+  path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_655'+ format,
+  path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_483'+ format,
+  path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_613'+ format,
+  path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_592'+ format,
+  path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_865'+ format,
+  path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_561'+ format,
+  path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_443'+ format,
+  path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_443'+ format,
+  path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_592'+ format,
+  path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_561'+ format,
+  path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_865'+ format,
+  path + 'acolite_L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_865'+ format,
+  path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_613'+ format,
+  path + 'acolite_L8_OLI_2017_03_06_14_35_04_233087_L2W_rhow_655'+ format,
+  path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_443'+ format,
+  path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_592'+ format
 ];
 
-// Function to extract metadata and assign bands
+// Extract metadata and load image
 var extractMetadata = function(uri) {
   var filename = ee.String(uri);
-  
-  // Separate parts by '_'
   var parts = filename.split('_');
+  
   var predio = ee.String(parts.get(1)).split('/').get(1);
   var year = ee.Number.parse(parts.get(3));
   var month = ee.Number.parse(parts.get(4));
   var day = ee.Number.parse(parts.get(5));
-  var date = ee.Date.fromYMD(year, month, day); // Date
-  
-  var col = ee.Number(ee.String(parts.get(9)).slice(0, 3)); // Column
-  var row = ee.Number(ee.String(parts.get(9)).slice(4, 6)); // Row
-  var wavelength = ee.Number.parse(ee.String(parts.get(12)).slice(0, -4)); // Wavelength
-  
-  // Match the wavelength to band info
+  var date = ee.Date.fromYMD(year, month, day);
+  var wavelength = ee.Number.parse(parts.get(12))//.slice(0, -4));
   var bandData = bandMapping[wavelength.getInfo()] || {bands: 'Unknown'};
-  
-  var timeStart = date  // 6 hours before the given date
-  var timeEnd = date.advance(6, 'hour'); 
-  
-  // Load the image and set metadata
-  return ee.Image.loadGeoTIFF(uri)
+  return ee.Image(uri)
     .set('date', date)
-    .set('column', col)
-    .set('row', row)
     .set('wavelength', wavelength)
-    .set('predio', predio)
-    .set('bandName', bandData.bands)
-    .set('system:time_start', timeStart.millis()) // Set system:time_start
-    .set('system:time_end', timeEnd.millis());  
+    .set('bandName', bandData.bands);
+    
 };
 
 // Map URIs to images with metadata
-var images = uris.map(extractMetadata);
+var images = ee.List(uris.map(extractMetadata));
 
-// Convert the list of images into an ImageCollection
 var collection = ee.ImageCollection(images);
 
-// Group by date and stack bands for each date
+// Group images by date and stack bands
 var uniqueDates = collection.aggregate_array('date').distinct();
-
 var groupedByDate = uniqueDates.map(function(date) {
   date = ee.Date(date);
   
-  // Filter images for the specific date
-  var bandsForDate = collection.filter(ee.Filter.eq('date', date))
-    .sort('bandName'); // Ensure bands are ordered correctly
+  var bandsForDate = collection.filter(ee.Filter.eq('date', date)).sort('bandName');
   
-  // Use `iterate` to add each band image as a new band in a single image
   var stackedImage = bandsForDate.iterate(function(bandImage, previous) {
     previous = ee.Image(previous);
     bandImage = ee.Image(bandImage);
@@ -113,7 +95,10 @@ var groupedByDate = uniqueDates.map(function(date) {
 });
 
 // Convert the grouped images to an ImageCollection of composites by date
-var compositeCollection = ee.ImageCollection(groupedByDate);
+var compositeCollection = ee.ImageCollection(ee.List(groupedByDate));
+
+// Print to console for verification
+
 
 var style_perlita = {
     min: 100,
@@ -124,7 +109,7 @@ var style_perlita = {
 
 // Function to apply scale factors to Landsat 8 imagery
 function applyScaleFactors(image) {
-  var opticalBands = image.select('SR_B.*').multiply(1);
+  var opticalBands = image.select('SR_B.').multiply(1);
   var ndvi = opticalBands.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI');
   var ndwi = opticalBands.normalizedDifference(['SR_B3', 'SR_B5']).rename('NDWI');
   var evi = image.expression(
@@ -191,12 +176,10 @@ var uniqueDatesStrings = uniqueDates.map(function(date) {
   return year.cat('-').cat(month).cat('-').cat(day);
 });
 
-// Step 4: Print the dates as a list of strings
 
 var dateItems = uniqueDatesStrings.getInfo();
 
 
-// Function to apply scale factors to Landsat 8 imagery
 function applyScaleFactors(image) {
   var opticalBands = image.select('SR_B.').multiply(1);
   var ndvi = opticalBands.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI');
@@ -491,10 +474,10 @@ function activateInspector(map) {
 // Declare chartPanel variable outside the function
 var chartPanel;
 
-// Function to generate the chart based on the selected index and all dates
 function generateChart(lon, lat) {
   // Remove the existing chart panel if it exists
   if (chartPanel) {
+    //l8app.selectorPanel.
     rightMap.remove(chartPanel);
     ui.root.remove(chartPanel);
   }
@@ -511,27 +494,34 @@ function generateChart(lon, lat) {
 
   var point = ee.Geometry.Point([lon, lat]);
 
-  // Function to retrieve index values for each date
+  // Function to retrieve index values for each date and calculate the mean
   var values = dateItems.map(function(date) {
-    var image = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
-      .filterDate(ee.Date(date), ee.Date(date).advance(2, 'day'))
+    // Filter compositeCollection by date and apply scale factors
+    var image = compositeCollection
+      //.filter(ee.Filter.eq('date', date))
       .map(applyScaleFactors)
-      .max()
-      .select(selectedIndex)
-      .reduceRegion({
-        reducer: ee.Reducer.mean(),
-        geometry: point,
-        scale: 30
-      });
-    return ee.Number(image.get(selectedIndex)).getInfo();
+      .max()  // Assuming max composite for the date
+      .select(selectedIndex);  // Select the index you need
+    print(image)
+    // Calculate mean value over the comunaSeleccionada geometry
+    var meanValue = image.reduceRegion({
+      reducer: ee.Reducer.mean(),
+      geometry: point,
+      scale: 30,  // Define appropriate scale based on your data
+      maxPixels: 1e8
+    });
+
+    // Retrieve the value of the selected index for the current date
+    return ee.Number(meanValue.get(selectedIndex)).getInfo();
   });
 
-  // Generate chart using values and dates
+  // Generate chart data
   var chartData = {
     labels: dateItems,
     values: values
   };
 
+  // Create the chart
   var chart = ui.Chart.array.values(chartData.values, 0, chartData.labels)
     .setOptions({
       title: selectedIndex + ' Over Time',
@@ -540,7 +530,7 @@ function generateChart(lon, lat) {
       pointSize: 5,
       series: {0: {color: '#1a9850'}}
     });
-  
+
   // Add the chart to the chart panel
   chartPanel.add(chart);
 
