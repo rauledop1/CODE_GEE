@@ -4,7 +4,7 @@ var table = ui.Chart(
     ],
     'Table', {allowHtml: true});
 
-var table = table
+// var table = table
 
 // load image from bucket
 
@@ -460,7 +460,7 @@ var inspectorButton = ui.Button({
   },
   style: {margin: '2px'}
 });
-l8app.selectorPanel.add(inspectorButton);
+//l8app.selectorPanel.add(inspectorButton);
 
 // Function to activate the map inspector
 function activateInspector(map) {
@@ -502,7 +502,7 @@ function generateChart(lon, lat) {
       .map(applyScaleFactors)
       .max()  // Assuming max composite for the date
       .select(selectedIndex);  // Select the index you need
-    print(image)
+      
     // Calculate mean value over the comunaSeleccionada geometry
     var meanValue = image.reduceRegion({
       reducer: ee.Reducer.mean(),
@@ -539,6 +539,145 @@ function generateChart(lon, lat) {
 }
 
 
+// funcion boxplot
+
+function generateChart2() {
+  // Remove the existing chart panel if it exists
+  if (chartPanel) {
+    rightMap.remove(chartPanel);
+    ui.root.remove(chartPanel);
+  }
+
+  // Define the new chart panel position and style
+  chartPanel = ui.Panel({
+    style: {
+      position: 'bottom-right',
+      width: '300px',
+      height: '229px',
+      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    },
+  });
+
+  // Get the geometry of the selected comuna
+  var comunaGeometry = comunaSeleccionada.geometry(); // Assuming comunaSeleccionada is a feature
+
+  // Retrieve index values for each date and calculate the mean over the comuna geometry
+  var values = dateItems.map(function (date) {
+    // Filter compositeCollection by date and apply scale factors
+    var image = compositeCollection
+      //.filterDate(date.start(), date.end()) // Assuming dateItems contains start and end dates
+      .map(applyScaleFactors)
+      .median() // Assuming median composite for the date range
+      .select(selectedIndex); // Select the desired index
+
+    // Calculate mean value over the comunaSeleccionada geometry
+    var meanValue = image.reduceRegion({
+      reducer: ee.Reducer.mean(),
+      geometry: comunaGeometry,
+      scale: 30, // Adjust scale as needed
+      maxPixels: 1e8,
+    });
+
+    // Retrieve the value of the selected index for the current date
+    return ee.Number(meanValue.get(selectedIndex)).getInfo();
+  });
+
+  // Generate chart data
+  var chartData = {
+    labels: dateItems.map(function (date) {
+      return date.format('YYYY-MM-dd').getInfo(); // Format the dates for the chart labels
+    }),
+    values: values,
+  };
+
+  // Create the chart
+  var chart = ui.Chart.array
+    .values(chartData.values, 0, chartData.labels)
+    .setOptions({
+      title: selectedIndex + ' Over Time for ' + comunaSeleccionada.get('name').getInfo(), // Assumes the comuna has a 'name' property
+      hAxis: { title: 'Dates' },
+      vAxis: { title: selectedIndex },
+      pointSize: 5,
+      series: { 0: { color: '#1a9850' } },
+    });
+
+  // Add the chart to the chart panel
+  chartPanel.add(chart);
+
+  // Add the chart panel to the map and UI root
+  rightMap.add(chartPanel);
+}
+
+function activateDrawingTool(callback) {
+  var drawingTools = leftMap.drawingTools();
+  drawingTools.setShape('polygon'); // You can also use 'rectangle', 'line', etc.
+  drawingTools.setDrawModes(['polygon']); // Restrict to polygon drawing
+  drawingTools.draw(); // Start drawing
+
+  // Event listener for geometry completion
+  drawingTools.onDraw(function () {
+    var drawnGeometry = drawingTools.layers().get(0).getEeObject();
+    if (drawnGeometry) {
+      drawingTools.stop(); // Stop drawing mode
+      drawingTools.layers().reset(); // Clear the drawn layers if needed
+      callback(drawnGeometry);
+    }
+  });
+}
+
+
+// Function to generate the chart using a polygon geometry
+function generateChartWithPolygon(geometry) {
+  if (chartPanel) {
+    rightMap.remove(chartPanel);
+    ui.root.remove(chartPanel);
+  }
+
+  chartPanel = ui.Panel({
+    style: {
+      position: 'bottom-right',
+      width: '300px',
+      height: '229px',
+      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    },
+  });
+
+  // Ensure dateItems contains valid dates
+  var values = dateItems.map(function (date) {
+    var image = compositeCollection
+      .filter(ee.Filter.eq('date', ee.Date(date)))
+      .map(applyScaleFactors)
+      .max()
+      .select(selectedIndex)
+      .reduceRegion({
+        reducer: ee.Reducer.mean(),
+        geometry: geometry,
+        scale: 30
+      });
+
+    return ee.Number(image.get(selectedIndex)).getInfo();
+  });
+
+  // Generate chart data
+  var chartData = {
+    labels: dateItems,
+    values: values
+  };
+
+  var chart = ui.Chart.array
+    .values(chartData.values, 0, chartData.labels)
+    .setOptions({
+      title: selectedIndex + ' por año',
+      hAxis: { title: 'Fechas' },
+      vAxis: { title: selectedIndex },
+      pointSize: 5,
+      series: { 0: { color: '#1a9850' } },
+    });
+
+  chartPanel.add(chart);
+  rightMap.add(chartPanel);
+}
+
 // Function to add a red dot marker at the clicked point and remove previous markers
 function addRedDot(map, coords) {
   // Remove previous markers from each map, if they exist
@@ -574,11 +713,27 @@ l8app.intro.panel.add(boxplotSection);
 // First ComboBox for selecting 'manual' or 'poligono'
 var selectionOptions = ['manual', 'poligono'];
 var firstComboBox = ui.Select({
-  items: selectionOptions,
+  items: ['Seleccione', 'poligono', 'manual'],
   placeholder: 'Seleccione',
   style: {
-            fontSize: '14px', 
-            color: '#3C6E71'}
+    fontSize: '14px',
+    color: '#3C6E71',
+  },
+  onChange: function (selection) {
+    if (selection === 'poligono') {
+      // Use the selected polygon (comunaSeleccionada)
+      if (comunaSeleccionada) {
+        generateChartWithPolygon(comunaSeleccionada.geometry());
+      } else {
+        ui.notify('No polygon selected', 'Please select a polygon first.');
+      }
+    } else if (selection === 'manual') {
+      // Activate the drawing tool
+      activateDrawingTool(function (geometry) {
+        generateChartWithPolygon(geometry);
+      });
+    }
+  },
 });
 
 // Add the first ComboBox to the Boxplot section
