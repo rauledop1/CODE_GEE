@@ -4,9 +4,6 @@ var table = ui.Chart(
     ],
     'Table', {allowHtml: true});
 
-// var table = table
-
-// load image from bucket
 
 var bandMapping = {
   443: {name: 'Azul costero', bands: 'SR_B1'},   // Banda 1 (Blue coast)  [435-452 nm]
@@ -21,7 +18,6 @@ var path='projects/stellar-horizon-248313/assets/'
 var format = ''
 var gcp = true
 
-// Lista de URIs de las imágenes de GCS
 var uris = [
   path + 'acolite_L8_OLI_2020_02_11_14_35_19_233087_L2W_rhow_865'+ format,
   path + 'acolite_L8_OLI_2022_02_09_14_29_12_232087_L2W_rhow_561'+ format,
@@ -53,7 +49,6 @@ var uris = [
   path + 'acolite_L8_OLI_2014_10_24_14_35_29_233087_L2W_rhow_592'+ format
 ];
 
-// Extract metadata and load image
 var extractMetadata = function(uri) {
   var filename = ee.String(uri);
   var parts = filename.split('_');
@@ -72,12 +67,10 @@ var extractMetadata = function(uri) {
     
 };
 
-// Map URIs to images with metadata
 var images = ee.List(uris.map(extractMetadata));
 
 var collection = ee.ImageCollection(images);
 
-// Group images by date and stack bands
 var uniqueDates = collection.aggregate_array('date').distinct();
 var groupedByDate = uniqueDates.map(function(date) {
   date = ee.Date(date);
@@ -94,10 +87,8 @@ var groupedByDate = uniqueDates.map(function(date) {
   return ee.Image(stackedImage).set('date', date);
 });
 
-// Convert the grouped images to an ImageCollection of composites by date
-var compositeCollection = ee.ImageCollection(ee.List(groupedByDate));
 
-// Print to console for verification
+var compositeCollection = ee.ImageCollection(ee.List(groupedByDate));
 
 
 var style_perlita = {
@@ -105,26 +96,6 @@ var style_perlita = {
     max: 150,
     palette: ['#ffffff', '#ffc0cb', '#ff69b4', '#ff1493', '#8b008b']
 };
-
-
-// Function to apply scale factors to Landsat 8 imagery
-function applyScaleFactors(image) {
-  var opticalBands = image.select('SR_B.').multiply(1);
-  var ndvi = opticalBands.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI');
-  var ndwi = opticalBands.normalizedDifference(['SR_B3', 'SR_B5']).rename('NDWI');
-  var evi = image.expression(
-    '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))', {
-      'NIR': opticalBands.select('SR_B5'),
-      'RED': opticalBands.select('SR_B4'),
-      'BLUE': opticalBands.select('SR_B2')
-    }).rename('EVI');
-  var perlita = image.expression(
-    '21.3 * (BLUE / RED) + 2.45', {
-      'BLUE': opticalBands.select('SR_B2'),
-      'RED': opticalBands.select('SR_B4')
-    }).rename('Perlita');
-  return image.addBands([ndvi, ndwi, evi, perlita]);
-}
 
 //var applyScaleFactors = require('users/raulperezastorga/VariosEjemplos/08_app_rs:applyScaleFactors')
 var l8app = {};
@@ -134,6 +105,10 @@ var imgId;
 var imgDate;
 var bf_imgButton;
 var vectors; 
+var previousPlot = null;
+var previousGraphUI = null;
+var drawingTool = null;
+var chartPanel = null;
 var url_feature;
 var predstyle = {color: 'yellow', fillColor: '00000000'};
 var lago_style = {color: 'blue', fillColor: '00000000'};
@@ -165,6 +140,8 @@ var style_perlita = {
 var style_rgb = {bands: ['SR_B4', 'SR_B3', 'SR_B2'], min: 7000, max: 13000};
 var style_falsecolor = {bands: ['SR_B5', 'SR_B4', 'SR_B3'], min: 7000, max: 18000};
 
+
+
 var datesCollection = compositeCollection.aggregate_array('date');
 var uniqueDates = ee.List(datesCollection.distinct()).sort();
 
@@ -180,8 +157,9 @@ var uniqueDatesStrings = uniqueDates.map(function(date) {
 var dateItems = uniqueDatesStrings.getInfo();
 
 
-function applyScaleFactors(image) {
-  var opticalBands = image.select('SR_B.').multiply(1);
+function applyScaleFactors(image, location) {
+  var opticalBands = image.select('SR_B.*').multiply(1); 
+
   var ndvi = opticalBands.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI');
   var ndwi = opticalBands.normalizedDifference(['SR_B3', 'SR_B5']).rename('NDWI');
   var evi = image.expression(
@@ -190,15 +168,46 @@ function applyScaleFactors(image) {
       'RED': opticalBands.select('SR_B4'),
       'BLUE': opticalBands.select('SR_B2')
     }).rename('EVI');
-  var perlita = image.expression(
-    '21.3 * (BLUE / RED) + 2.45', {
-      'BLUE': opticalBands.select('SR_B2'),
-      'RED': opticalBands.select('SR_B4')
-    }).rename('Perlita');
-  return image.addBands([ndvi, ndwi, evi, perlita]);
+  
+  // Optionally, if you want to retrieve a string value for comparison
+  var location = location.getInfo();  // To get the value in the client-side
+
+  // Create the Perlita index based on the location
+  var perlita;
+
+  if (location == 'Villarrica') {
+    perlita = image.expression(
+      '21.3 * (BLUE / RED) + 2.45', {
+        'BLUE': opticalBands.select('SR_B2'),
+        'RED': opticalBands.select('SR_B4')
+      }).rename('Perlita');
+  } else if (location == 'Lanalhue') {
+    perlita = image.expression(
+      '5.3 * (BLUE / RED) + 5.45', {
+        'BLUE': opticalBands.select('SR_B2'),
+        'RED': opticalBands.select('SR_B4')
+      }).rename('Perlita');
+  } else if (location == 'Llanquihue') {
+    perlita = image.expression(
+      '6 * (BLUE / RED) + 4', {
+        'BLUE': opticalBands.select('SR_B2'),
+        'RED': opticalBands.select('SR_B4')
+      }).rename('Perlita');
+  } else if (location == 'San Pedro') {
+    perlita = image.expression(
+      '6.5 * (BLUE / RED) + 4.5', {
+        'BLUE': opticalBands.select('SR_B2'),
+        'RED': opticalBands.select('SR_B4')
+      }).rename('Perlita');
+  } else {
+    print('Location not recognized, no formula set');
+    return image; 
+  }
+
+  
+  return image.addBands([ndvi, ndwi, evi, perlita]); 
 }
 
-// Create the left date selector
 var leftDateSelector = ui.Select({
   items: dateItems,
   placeholder: 'fecha',
@@ -207,7 +216,6 @@ var leftDateSelector = ui.Select({
   }
 });
 
-// Wrap the left date selector in a panel for positioning
 var leftDateTextBox = ui.Panel({
   widgets: [
     ui.Label('Fecha (Izquierda):'),
@@ -217,11 +225,10 @@ var leftDateTextBox = ui.Panel({
   style: {
     position: 'top-left',
     padding: '2px',
-    backgroundColor: 'rgba(60, 110, 113, 0.5)' // Optional: Background color
+    backgroundColor: 'rgba(60, 110, 113, 0.5)'
   }
 });
 
-// Create the right date selector
 var rightDateSelector = ui.Select({
   items: dateItems,
   placeholder: 'fecha',
@@ -230,7 +237,6 @@ var rightDateSelector = ui.Select({
   }
 });
 
-// Wrap the right date selector in a panel for positioning
 var rightDateTextBox = ui.Panel({
   widgets: [
     ui.Label('Fecha (Derecha):'),
@@ -240,30 +246,25 @@ var rightDateTextBox = ui.Panel({
   style: {
     position: 'top-right',
     padding: '2px',
-    backgroundColor: 'rgba(60, 110, 113, 0.5)' // Optional: Background color
+    backgroundColor: 'rgba(60, 110, 113, 0.5)' 
   }
 });
 
-// Create left and right maps
-var leftMap = ui.Map();  // Left map
-var rightMap = ui.Map();  // Right map
+var leftMap = ui.Map();  
+var rightMap = ui.Map();  
 
-// Add the date text boxes to the maps
 leftMap.add(leftDateTextBox);
 rightMap.add(rightDateTextBox);
 
 leftMap.setOptions('SATELLITE');
 rightMap.setOptions('SATELLITE');
 
-// Center point for the maps
 var centerPoint = ee.Geometry.Point([-73.5, -37.5]);
 leftMap.centerObject(centerPoint, 9);
 rightMap.centerObject(centerPoint, 9);
 
-// Link the left and right maps for synchronization
 var linker = ui.Map.Linker([leftMap, rightMap]);
 
-// Create a split panel with the two maps
 var splitPanel = ui.SplitPanel({
   firstPanel: leftMap,
   secondPanel: rightMap,
@@ -271,13 +272,8 @@ var splitPanel = ui.SplitPanel({
   wipe: true
 });
 
-// Add the split panel to the main interface
 l8app.splitpanel = ui.root.widgets().reset([splitPanel]);
 
-//var titlePanel = ui.Panel([table], 'flow', {width: '300px', padding: '8px'});
-
-
-// Create header for the app
 l8app.intro = {
   panel: ui.Panel({
     widgets: [
@@ -290,9 +286,9 @@ l8app.intro = {
             color: '#3C6E71'
           }
         })
-      ], ui.Panel.Layout.Flow('horizontal'), {width: '100%', textAlign: 'center'}),  // Panel contenedor centrado
+      ], ui.Panel.Layout.Flow('horizontal'), {width: '100%', textAlign: 'center'}), 
 
-      table,  // Se asume que "table" está definida previamente
+      table, 
 
       ui.Panel([
         ui.Label({
@@ -302,25 +298,20 @@ l8app.intro = {
             color: '#3C6E71'
           }
         })
-      ], ui.Panel.Layout.Flow('horizontal'), {width: '100%', textAlign: 'center'})  // Panel contenedor centrado
+      ], ui.Panel.Layout.Flow('horizontal'), {width: '100%', textAlign: 'center'}) 
     ],
     style: {
-      width: '300px',  // Define el ancho del panel
+      width: '300px', 
       padding: '10px'
     }
   })
 };
 
 
-
-// Administrative areas feature collection
-// proyect must need lakes projects/stellar-horizon-248313/assets/Cuerpos_Agua_pp
 var areasAdministrativas = ee.FeatureCollection('projects/stellar-horizon-248313/assets/Cuerpos_Agua_pp')
-                          //.filter(ee.Filter.eq('codregion', 9));
 var comunas = areasAdministrativas.aggregate_array('Nombre').sort();
 var comunaSeleccionada = null;
 
-// Create a dropdown for selecting communes in Chile
 var selectorComuna = ui.Select({
   items: [],
   placeholder: 'Lagos',
@@ -328,19 +319,14 @@ var selectorComuna = ui.Select({
     comunaSeleccionada = areasAdministrativas.filter(ee.Filter.eq('Nombre', seleccionada));
     leftMap.centerObject(comunaSeleccionada);
     rightMap.centerObject(comunaSeleccionada);
-    //
     leftMap.addLayer(comunaSeleccionada, lago_style, 'lago izquierda');
     rightMap.addLayer(comunaSeleccionada, lago_style, 'lago derecha');
-    //
   }
 });
 
-// Evaluate and fill the selector with commune names
 comunas.evaluate(function(nombres) {
   selectorComuna.items().reset(nombres);
 });
-
-// Add the commune selector to the panel
 var predios_panel = ui.Panel({
   widgets: [
     ui.Label('Lagos:'),
@@ -350,7 +336,6 @@ var predios_panel = ui.Panel({
   style: {stretch: 'horizontal', margin: '1px'}
 });
 
-// Index selector
 var indexOptions = ['NDVI', 'NDWI', 'EVI', 'Perlita','RGB','Falso Color'];
 var selectedIndex = 'NDVI';
 
@@ -364,7 +349,6 @@ var selectorIndex = ui.Select({
   }
 });
 
-// Panel for index selector
 var index_panel = ui.Panel({
   widgets: [
     ui.Label('Índice:'),
@@ -380,16 +364,15 @@ l8app.selectorPanel = ui.Panel({
   style: {color: '#3C6E71', margin: '1px', padding: '1px'}
 });
 
-// Load image based on the selected date and index
 function loadImage(selectedDate, map) {
   var date = ee.Date(selectedDate);
   var nextDate = date.advance(2, 'day');
-
   var dataset = compositeCollection
       .filter(ee.Filter.eq('date', date))
-      .map(applyScaleFactors)
+      .map(function(image) {
+        return applyScaleFactors(image, ee.String(comunaSeleccionada.first().get('Nombre'))); // Pass the location for dynamic formula
+      })
       .max();
-      //.clip(comunaSeleccionada);
 
   var indexStyle, indexBand;
   switch (selectedIndex) {
@@ -436,12 +419,8 @@ function loadImage(selectedDate, map) {
   }
 }
 
-
-// Define global variables for the inspector and chart elements
 var isInspecting = false;
-var chartPanel;
 
-// Create the Inspector button and add it to the selector panel
 var inspectorButton = ui.Button({
   label: 'Inspector',
   onClick: function() {
@@ -460,227 +439,9 @@ var inspectorButton = ui.Button({
   },
   style: {margin: '2px'}
 });
-//l8app.selectorPanel.add(inspectorButton);
 
-// Function to activate the map inspector
-function activateInspector(map) {
-  map.style().set('cursor', 'crosshair');  // Change cursor to cross symbol
-  map.onClick(function(coords) {
-    generateChart(coords.lon, coords.lat);
-    addRedDot(map, coords);  // Place the red dot on the map at click location
-  });
-}
-
-// Declare chartPanel variable outside the function
-var chartPanel;
-
-function generateChart(lon, lat) {
-  // Remove the existing chart panel if it exists
-  if (chartPanel) {
-    //l8app.selectorPanel.
-    rightMap.remove(chartPanel);
-    ui.root.remove(chartPanel);
-  }
-
-  // Define the new chart panel position and style
-  chartPanel = ui.Panel({
-    style: {
-      position: 'bottom-right',
-      width: '300px',
-      height: '229px',
-      backgroundColor: 'rgba(255, 255, 255, 0.8)'
-    }
-  });
-
-  var point = ee.Geometry.Point([lon, lat]);
-
-  // Function to retrieve index values for each date and calculate the mean
-  var values = dateItems.map(function(date) {
-    // Filter compositeCollection by date and apply scale factors
-    var image = compositeCollection
-      //.filter(ee.Filter.eq('date', date))
-      .map(applyScaleFactors)
-      .max()  // Assuming max composite for the date
-      .select(selectedIndex);  // Select the index you need
-      
-    // Calculate mean value over the comunaSeleccionada geometry
-    var meanValue = image.reduceRegion({
-      reducer: ee.Reducer.mean(),
-      geometry: point,
-      scale: 30,  // Define appropriate scale based on your data
-      maxPixels: 1e8
-    });
-
-    // Retrieve the value of the selected index for the current date
-    return ee.Number(meanValue.get(selectedIndex)).getInfo();
-  });
-
-  // Generate chart data
-  var chartData = {
-    labels: dateItems,
-    values: values
-  };
-
-  // Create the chart
-  var chart = ui.Chart.array.values(chartData.values, 0, chartData.labels)
-    .setOptions({
-      title: selectedIndex + ' Over Time',
-      hAxis: {title: 'Dates'},
-      vAxis: {title: selectedIndex},
-      pointSize: 5,
-      series: {0: {color: '#1a9850'}}
-    });
-
-  // Add the chart to the chart panel
-  chartPanel.add(chart);
-
-  // Add the chart panel to the map and UI root
-  rightMap.add(chartPanel);
-}
-
-
-// funcion boxplot
-
-function generateChart2() {
-  // Remove the existing chart panel if it exists
-  if (chartPanel) {
-    rightMap.remove(chartPanel);
-    ui.root.remove(chartPanel);
-  }
-
-  // Define the new chart panel position and style
-  chartPanel = ui.Panel({
-    style: {
-      position: 'bottom-right',
-      width: '300px',
-      height: '229px',
-      backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    },
-  });
-
-  // Get the geometry of the selected comuna
-  var comunaGeometry = comunaSeleccionada.geometry(); // Assuming comunaSeleccionada is a feature
-
-  // Retrieve index values for each date and calculate the mean over the comuna geometry
-  var values = dateItems.map(function (date) {
-    // Filter compositeCollection by date and apply scale factors
-    var image = compositeCollection
-      //.filterDate(date.start(), date.end()) // Assuming dateItems contains start and end dates
-      .map(applyScaleFactors)
-      .median() // Assuming median composite for the date range
-      .select(selectedIndex); // Select the desired index
-
-    // Calculate mean value over the comunaSeleccionada geometry
-    var meanValue = image.reduceRegion({
-      reducer: ee.Reducer.mean(),
-      geometry: comunaGeometry,
-      scale: 30, // Adjust scale as needed
-      maxPixels: 1e8,
-    });
-
-    // Retrieve the value of the selected index for the current date
-    return ee.Number(meanValue.get(selectedIndex)).getInfo();
-  });
-
-  // Generate chart data
-  var chartData = {
-    labels: dateItems.map(function (date) {
-      return date.format('YYYY-MM-dd').getInfo(); // Format the dates for the chart labels
-    }),
-    values: values,
-  };
-
-  // Create the chart
-  var chart = ui.Chart.array
-    .values(chartData.values, 0, chartData.labels)
-    .setOptions({
-      title: selectedIndex + ' Over Time for ' + comunaSeleccionada.get('name').getInfo(), // Assumes the comuna has a 'name' property
-      hAxis: { title: 'Dates' },
-      vAxis: { title: selectedIndex },
-      pointSize: 5,
-      series: { 0: { color: '#1a9850' } },
-    });
-
-  // Add the chart to the chart panel
-  chartPanel.add(chart);
-
-  // Add the chart panel to the map and UI root
-  rightMap.add(chartPanel);
-}
-
-function activateDrawingTool(callback) {
-  var drawingTools = leftMap.drawingTools();
-  drawingTools.setShape('polygon'); // You can also use 'rectangle', 'line', etc.
-  drawingTools.setDrawModes(['polygon']); // Restrict to polygon drawing
-  drawingTools.draw(); // Start drawing
-
-  // Event listener for geometry completion
-  drawingTools.onDraw(function () {
-    var drawnGeometry = drawingTools.layers().get(0).getEeObject();
-    if (drawnGeometry) {
-      drawingTools.stop(); // Stop drawing mode
-      drawingTools.layers().reset(); // Clear the drawn layers if needed
-      callback(drawnGeometry);
-    }
-  });
-}
-
-
-// Function to generate the chart using a polygon geometry
-function generateChartWithPolygon(geometry) {
-  if (chartPanel) {
-    rightMap.remove(chartPanel);
-    ui.root.remove(chartPanel);
-  }
-
-  chartPanel = ui.Panel({
-    style: {
-      position: 'bottom-right',
-      width: '300px',
-      height: '229px',
-      backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    },
-  });
-
-  // Ensure dateItems contains valid dates
-  var values = dateItems.map(function (date) {
-    var image = compositeCollection
-      .filter(ee.Filter.eq('date', ee.Date(date)))
-      .map(applyScaleFactors)
-      .max()
-      .select(selectedIndex)
-      .reduceRegion({
-        reducer: ee.Reducer.mean(),
-        geometry: geometry,
-        scale: 30
-      });
-
-    return ee.Number(image.get(selectedIndex)).getInfo();
-  });
-
-  // Generate chart data
-  var chartData = {
-    labels: dateItems,
-    values: values
-  };
-
-  var chart = ui.Chart.array
-    .values(chartData.values, 0, chartData.labels)
-    .setOptions({
-      title: selectedIndex + ' por año',
-      hAxis: { title: 'Fechas' },
-      vAxis: { title: selectedIndex },
-      pointSize: 5,
-      series: { 0: { color: '#1a9850' } },
-    });
-
-  chartPanel.add(chart);
-  rightMap.add(chartPanel);
-}
-
-// Function to add a red dot marker at the clicked point and remove previous markers
 function addRedDot(map, coords) {
-  // Remove previous markers from each map, if they exist
+
   if (leftMarker) {
     leftMap.layers().remove(leftMarker);
   }
@@ -697,69 +458,351 @@ function addRedDot(map, coords) {
   leftMap.layers().add(leftMarker);
   rightMap.layers().add(rightMarker);
 }
-// Add the selector panel and intro panel to the UI
+
+function activateInspector(map) {
+  map.style().set('cursor', 'crosshair'); 
+  map.onClick(function(coords) {
+    generateChart(coords.lon, coords.lat);
+    addRedDot(map, coords); 
+  });
+}
+
+var chartPanel;
+
+function generateChart(lon, lat) {
+
+  if (chartPanel) {
+    boxplotSection.remove(chartPanel);
+    ui.root.remove(chartPanel);
+  }
+
+  chartPanel = ui.Panel({
+    style: {
+      position: 'bottom-right',
+      width: '300px',
+      height: '229px',
+      backgroundColor: 'rgba(255, 255, 255, 0.8)'
+    }
+  });
+
+  var point = ee.Geometry.Point([lon, lat]);
+
+  var values = dateItems.map(function(date) {
+    var image = compositeCollection
+      .filter(ee.Filter.eq('date', ee.Date(date)))
+      .map(function(image) {
+        return applyScaleFactors(image, ee.String(comunaSeleccionada.first().get('Nombre'))); // Pass the location for dynamic formula
+      })
+      .max()
+      .select(selectedIndex);
+      
+    var meanValue = image.reduceRegion({
+      reducer: ee.Reducer.mean(),
+      geometry: point,
+      scale: 30,
+      maxPixels: 1e8
+    });
+
+    return ee.Number(meanValue.get(selectedIndex)).getInfo();
+  });
+
+  var chartData = {
+    labels: dateItems,
+    values: values
+  };
+
+  var chart = ui.Chart.array.values(chartData.values, 0, chartData.labels)
+    .setOptions({
+      title: selectedIndex + ' Over Time',
+      hAxis: {title: 'Dates'},
+      vAxis: {title: selectedIndex},
+      pointSize: 5,
+      series: {0: {color: '#1a9850'}}
+    });
+
+  chartPanel.add(chart);
+
+  boxplotSection.add(chartPanel);
+}
+
+function activateDrawingTool(callback) {
+  var drawingTools = leftMap.drawingTools();
+  drawingTools.setShape('polygon'); 
+  drawingTools.setDrawModes(['polygon']); 
+  drawingTools.draw(); 
+
+
+  drawingTools.onDraw(function () {
+    var drawnGeometry = drawingTools.layers().get(0).getEeObject();
+    if (drawnGeometry) {
+      drawingTools.stop(); 
+      drawingTools.layers().reset(); 
+      callback(drawnGeometry);
+    }
+  });
+}
+
+
+function generateBoxPlotWithPolygon(geometry) {
+  
+
+  if (chartPanel) {
+    rightMap.remove(chartPanel);
+    ui.root.remove(chartPanel);
+  }
+
+  var values = compositeCollection
+    //.filter(ee.Filter.calendarRange(startYear, endYear, 'year'))
+    .map(function(image) {
+      return applyScaleFactors(image, ee.String(comunaSeleccionada.first().get('Nombre'))); // Pass the location for dynamic formula
+    })
+    .sort('date')
+    .map(function(image) {
+      var index = image.select(selectedIndex);
+      
+      var allReducers = ee.Reducer.median()
+        .combine({reducer2: ee.Reducer.min(), sharedInputs: true})
+        .combine({reducer2: ee.Reducer.max(), sharedInputs: true})
+        .combine({reducer2: ee.Reducer.percentile([25]), sharedInputs: true})
+        .combine({reducer2: ee.Reducer.percentile([50]), sharedInputs: true})
+        .combine({reducer2: ee.Reducer.percentile([75]), sharedInputs: true});
+        
+      var stats = index.reduceRegion({
+        reducer: allReducers,
+        geometry: geometry,
+        scale: 30
+      });
+      
+      var dateString = ee.Date(image.get('date')).format('YYYY-MM-dd');
+      var properties = {
+        'date': dateString,
+        'median': stats.get(selectedIndex + '_p50'), // median is 50th percentile
+        'min': stats.get(selectedIndex + '_min'),
+        'max': stats.get(selectedIndex + '_max'),
+        'p25': stats.get(selectedIndex + '_p25'),
+        'p50': stats.get(selectedIndex + '_p50'),
+        'p75': stats.get(selectedIndex + '_p75'),
+      };
+      return ee.Feature(null, properties);
+    });
+
+  var values = values.filter(ee.Filter.notNull(
+    ['median', 'min', 'max', 'p25', 'p50', 'p75']
+  ));
+  
+  var dateList = values.aggregate_array('date');
+  
+  function formatDate(date) {
+    var year = ee.Date(date).get('year').format();
+    var month = ee.Date(date).get('month').subtract(1).format();
+    var day = ee.Date(date).get('day').format();
+    return ee.String('Date(')
+      .cat(year)
+      .cat(', ')
+      .cat(month)
+      .cat(', ')
+      .cat(day)
+      .cat(ee.String(', 1)'));
+  }
+
+  var rowList = dateList.map(function(date) {
+    var f = values.filter(ee.Filter.eq('date', date)).first();
+    var x = formatDate(date);
+    var median = f.get('median');
+    var min = f.get('min');
+    var max = f.get('max');
+    var p25 = f.get('p25');
+    var p50 = f.get('p50');
+    var p75 = f.get('p75');
+    var rowDict = {
+      c: [{v: x}, {v: median}, {v: min}, {v: max},
+          {v: p25}, {v: p50}, {v: p75}]
+    };
+    return rowDict;
+  });
+
+  rowList.evaluate(function(rowListClient) {
+    var dataTable = {
+      cols: [
+        {id: 'x', type: 'date'},
+        {id: 'median', type: 'number'},
+        {id: 'min', type: 'number', role: 'interval'},
+        {id: 'max', type: 'number', role: 'interval'},
+        {id: 'firstQuartile', type: 'number', role: 'interval'},
+        {id: 'median', type: 'number', role: 'interval'},
+        {id: 'thirdQuartile', type: 'number', role: 'interval'}
+      ],
+      rows: rowListClient
+    };
+
+    var boxplot_options = {
+      title: selectedIndex + ' Time-Series Box Plot',
+      vAxis: {
+        title: selectedIndex,
+        gridlines: {
+          color: '#d9d9d9'
+        },
+        minorGridlines: {
+          color: 'transparent'
+        },
+        viewWindow: {
+          max: 1
+        }
+      },
+      hAxis: {
+        title: '',
+        format: 'YYYY-MMM',
+        gridlines: {
+          color: '#d9d9d9'
+        },
+        minorGridlines: {
+          color: 'transparent'
+        }
+      },
+      legend: {position: 'none'},
+      lineWidth: 1,
+      series: [{'color': '#D3362D'}],
+      interpolateNulls: true,
+      intervals: {
+        barWidth: 1,
+        boxWidth: 1,
+        lineWidth: 1,
+        style: 'boxes'
+      },
+      interval: {
+        min: {
+          style: 'bars',
+          fillOpacity: 1,
+          color: '#777777'
+        },
+        max: {
+          style: 'bars',
+          fillOpacity: 1,
+          color: '#777777'
+        }
+      },
+      chartArea: {left: 100, right: 100}
+    };
+
+    var chartPanel = ui.Panel({
+      style: {
+        position: 'bottom-right',
+        width: '400px',
+        height: '270px',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+      },
+    });
+
+    var chart = ui.Chart(dataTable, 'LineChart', boxplot_options);
+    chartPanel.add(chart);
+
+
+    var deleteButton = ui.Button({
+      label: 'Delete Chart',
+      style: {stretch: 'horizontal'},
+      onClick: function() {
+        rightMap.remove(chartPanel);
+        ui.root.remove(chartPanel);
+      }
+    });
+
+    chartPanel.add(deleteButton);
+    rightMap.add(chartPanel);
+  });
+}
+
 l8app.intro.panel.add(l8app.selectorPanel);
 ui.root.insert(0, l8app.intro.panel);
 
-// Create a new Boxplot section
 var boxplotSection = ui.Panel({
   layout: ui.Panel.Layout.flow('vertical'),
   style: {stretch: 'both'}
 });
 
-// Add the Boxplot section to the intro panel
 l8app.intro.panel.add(boxplotSection);
 
-// First ComboBox for selecting 'manual' or 'poligono'
 var selectionOptions = ['manual', 'poligono'];
 var firstComboBox = ui.Select({
-  items: ['Seleccione', 'poligono', 'manual'],
-  placeholder: 'Seleccione',
+  items: selectionOptions,
+  placeholder: 'Metodo',
   style: {
     fontSize: '14px',
     color: '#3C6E71',
   },
   onChange: function (selection) {
+    
+    
     if (selection === 'poligono') {
-      // Use the selected polygon (comunaSeleccionada)
       if (comunaSeleccionada) {
-        generateChartWithPolygon(comunaSeleccionada.geometry());
+        generateBoxPlotWithPolygon(comunaSeleccionada.geometry());
       } else {
         ui.notify('No polygon selected', 'Please select a polygon first.');
       }
     } else if (selection === 'manual') {
-      // Activate the drawing tool
       activateDrawingTool(function (geometry) {
-        generateChartWithPolygon(geometry);
+        generateBoxPlotWithPolygon(geometry);
       });
     }
   },
 });
 
-// Add the first ComboBox to the Boxplot section
+var seleccion = ui.Panel({
+  widgets: [
+    ui.Label({
+      value: 'Método Sel.',
+      style:{
+            fontSize: '14px', 
+            color: '#3C6E71'
+          }
+    }),
+    firstComboBox
+  ],
+  layout: ui.Panel.Layout.Flow('horizontal'),
+  style: {stretch: 'horizontal', margin: '10px', color: '#3C6E71'}
+});
+
 boxplotSection.add(ui.Label('BOX PLOT'));
-boxplotSection.add(ui.Label('Metodo Sel'));
-boxplotSection.add(firstComboBox);
+boxplotSection.add(seleccion);
 
-// Second ComboBox for selecting the range of years (1, 2, 3, 4, or 5 years)
 var yearOptions = ['2014', '2017', '2020', '2021', '2022'];
-var secondComboBox = ui.Select({
+
+var startYearComboBox = ui.Select({
   items: yearOptions,
-  placeholder: 'Select a range of years',
-  style: {margin: '10px'}
+  placeholder: 'Inicial',
+  style: {margin: '5px'}
 });
 
-// Add the second ComboBox to the Boxplot section
-boxplotSection.add(ui.Label('Select number of years:'));
-boxplotSection.add(secondComboBox);
-
-// Now you can add event listeners to handle the selected values if needed
-firstComboBox.onChange(function(value) {
-  console.log('Selected region type:', value);
-  // Add any functionality based on the selection
+var endYearComboBox = ui.Select({
+  items: yearOptions,
+  placeholder: 'Final',
+  style: {margin: '5px'}
 });
 
-secondComboBox.onChange(function(value) {
-  console.log('Selected range of years:', value);
-  // Add any functionality based on the selection
+var rangePanel = ui.Panel({
+  widgets: [
+    ui.Label({
+      value: 'Años',
+      style:{
+            fontSize: '14px', 
+            color: '#3C6E71'
+          }
+    }),
+    startYearComboBox,
+    endYearComboBox
+  ],
+  layout: ui.Panel.Layout.Flow('horizontal'),
+  style: {stretch: 'horizontal', margin: '10px', color: '#3C6E71'}
 });
+
+boxplotSection.add(rangePanel);
+
+startYearComboBox.onChange(function(value) {
+  console.log('Año inicial seleccionado:', value);
+});
+
+endYearComboBox.onChange(function(value) {
+  console.log('Año final seleccionado:', value);
+});
+
+
+boxplotSection.add(inspectorButton);
